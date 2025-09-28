@@ -1,4 +1,5 @@
 import ClientComponent from "@/components/ClientComponent";
+import TaskForm from "@/components/TaskForm";
 import { createSupabaseClient } from "@/lib/supabase/client";
 
 const setNewView = async () => {
@@ -14,8 +15,7 @@ const setNewView = async () => {
 export default async function HomePage() {
   return (
     <div className="p-3">
-      <p className="underline font-semibold text-xl"> Home Page</p>
-      <ClientComponent />
+      <TaskForm />
     </div>
   );
 }

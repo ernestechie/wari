@@ -3,11 +3,10 @@ import { createClient } from "@supabase/supabase-js";
 
 export const createSupabaseClient = async () => {
   const isServer = typeof window === "undefined";
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (isServer) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
     console.log("USING_SERVER_CLIENT");
 
     const { cookies } = await import("next/headers");
@@ -34,8 +33,8 @@ export const createSupabaseClient = async () => {
   } else {
     console.log("USING_BROWSER_CLIENT");
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    // const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    // const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     return createClient<Database>(supabaseUrl!, supabaseKey!);
   }
