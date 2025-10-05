@@ -1,14 +1,15 @@
 "use client";
 
-import React, { ChangeEvent, FormEvent, useState } from "react";
-
-interface Task {
-  id: number;
-  title: string;
-  description: string;
-  created_at: string;
-  image_url: string;
-}
+import { createSupabaseClient } from "@/lib/supabase/client";
+import React, {
+  ChangeEvent,
+  FormEvent,
+  MouseEventHandler,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 export default function TaskForm() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -16,33 +17,135 @@ export default function TaskForm() {
   const [newDescription, setNewDescription] = useState("");
   const [taskImage, setTaskImage] = useState<File | null>(null);
 
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+
+  const subapaseClient = useMemo(async () => {
+    const client = await createSupabaseClient();
+    return client;
+  }, []);
+
+  const fetchTasks = useCallback(async () => {
+    try {
+      const client = await subapaseClient;
+      const { data, error } = await client
+        .from("tasks")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.log(error);
+        return null;
+      }
+
+      console.log("Data", data);
+
+      return data;
+    } catch (err) {
+      console.error("error", err);
+    } finally {
+      setIsFetching(false);
+    }
+  }, [subapaseClient]);
+
+  useEffect(() => {
+    setIsFetching(true);
+    fetchTasks().then((data) => {
+      if (data) {
+        setTasks(data);
+      }
+    });
+  }, [fetchTasks]);
+
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setTaskImage(e.target.files[0]);
     }
   };
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    console.log("new_task", newTask);
+  const deleteTask = async (taskId: string) => {
+    try {
+      setIsLoading(true);
+      const client = await subapaseClient;
+      const { data, error } = await client
+        .from("tasks")
+        .delete()
+        .eq("id", taskId);
+
+      if (error) {
+        console.error("Error deleting a task: ", error?.message);
+        return;
+      }
+
+      // Update local tasks
+      const filteredTasks = (tasks || [])?.filter((task) => task.id !== taskId);
+      setTasks(filteredTasks);
+
+      console.log("data", data);
+    } catch (err) {
+      console.error("error", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e?.preventDefault();
+
+    try {
+      setIsLoading(true);
+      const client = await subapaseClient;
+      const { data, error } = await client
+        .from("tasks")
+        .insert(newTask)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error creating a task: ", error?.message);
+
+        return;
+      }
+
+      setNewTask({
+        title: "",
+        description: "",
+      });
+
+      console.log("data", data);
+    } catch (err) {
+      console.error("error", err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div style={{ maxWidth: "600px", margin: "0 auto", padding: "1rem" }}>
-      <h2>Task Manager CRUD</h2>
+      <h2 className="font-bold mb-4">Task Manager CRUD</h2>
+
+      {isLoading && <p className="text-lg">Loading...</p>}
 
       {/* Form to add a new task */}
-      <form style={{ marginBottom: "1rem" }} onSubmit={handleSubmit}>
+      <form
+        style={{ marginBottom: "1rem" }}
+        onSubmit={handleSubmit}
+        className={`${isLoading && "opacity-70"}`}
+      >
         <input
           type="text"
+          value={newTask.title}
           placeholder="Task Title"
           onChange={(e) =>
             setNewTask((prev) => ({ ...prev, title: e.target.value }))
           }
+          disabled={isLoading}
           style={{ width: "100%", marginBottom: "0.5rem", padding: "0.5rem" }}
         />
         <textarea
           placeholder="Task Description"
+          disabled={isLoading}
+          value={newTask.description}
           onChange={(e) =>
             setNewTask((prev) => ({ ...prev, description: e.target.value }))
           }
@@ -50,14 +153,18 @@ export default function TaskForm() {
         />
 
         <input type="file" accept="image/*" onChange={handleFileChange} />
-        <button type="submit" style={{ padding: "0.5rem 1rem" }}>
+        <button
+          type="submit"
+          style={{ padding: "0.5rem 1rem" }}
+          disabled={isLoading}
+        >
           Add Task
         </button>
       </form>
 
       {/* List of Tasks */}
       <ul style={{ listStyle: "none", padding: 0 }}>
-        {tasks.map((task, key) => (
+        {tasks?.map((task, key) => (
           <li
             key={key}
             style={{
@@ -67,22 +174,30 @@ export default function TaskForm() {
               marginBottom: "0.5rem",
             }}
           >
+            <div className="h-fit">
+              <h3 className="font-semibold">{task?.title}</h3>
+              <p>{task?.description}</p>
+              <p className="my-2 italic text-sm">~{task?.created_at}</p>
+              <img src={task?.image_url || ""} style={{ height: 70 }} />
+              <textarea
+                placeholder="Updated description..."
+                onChange={(e) => setNewDescription(e.target.value)}
+                className="p-4"
+              />
+            </div>
             <div>
-              <h3>{task.title}</h3>
-              <p>{task.description}</p>
-              <img src={task.image_url} style={{ height: 70 }} />
-              <div>
-                <textarea
-                  placeholder="Updated description..."
-                  onChange={(e) => setNewDescription(e.target.value)}
-                />
-                <button
-                  style={{ padding: "0.5rem 1rem", marginRight: "0.5rem" }}
-                >
-                  Edit
-                </button>
-                <button style={{ padding: "0.5rem 1rem" }}>Delete</button>
-              </div>
+              <button
+                style={{ padding: "0.5rem 1rem", marginRight: "0.5rem" }}
+                // onClick={() => updateTask(task.id)}
+              >
+                Edit
+              </button>
+              <button
+                style={{ padding: "0.5rem 1rem" }}
+                onClick={() => deleteTask(task.id)}
+              >
+                Delete
+              </button>
             </div>
           </li>
         ))}

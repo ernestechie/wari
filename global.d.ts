@@ -4,4 +4,5 @@ import { type Database as DB } from "@/lib/supabase/generated.types";
 declare global {
   export type Database = DB;
   export type Todo = DB["public"]["Tables"]["todos"]["Row"];
+  export type Task = DB["public"]["Tables"]["tasks"]["Row"];
 }
